@@ -74,22 +74,42 @@ public:
 };
 } // namespace std
 
-export template <typename P> class coro {
+namespace coro {
+export template <typename P> class t {
   std::coroutine_handle<P> m_handle;
 
-  coro(std::coroutine_handle<P> h) : m_handle{h} {}
+  t(std::coroutine_handle<P> h) : m_handle{h} {}
 
 public:
   using handle_type = std::coroutine_handle<P>;
   using promise_type = P;
 
-  ~coro() { m_handle.destroy(); }
+  ~t() { m_handle.destroy(); }
 
   [[nodiscard]] auto done() const noexcept { return m_handle.done(); }
   [[nodiscard]] auto resume() const noexcept { return m_handle.resume(); }
   [[nodiscard]] auto promise() const noexcept { return m_handle.promise(); }
 
-  [[nodiscard]] static coro<P> from_promise(P &p) {
+  [[nodiscard]] static t<P> from_promise(P &p) {
     return handle_type::from_promise(p);
   }
 };
+} // namespace coro
+
+namespace coro::promises {
+export template <typename Tp> struct basic_valued {
+  using coro = coro::t<basic_valued<Tp>>;
+
+  Tp value;
+
+  coro get_return_object() { return coro::from_promise(*this); }
+  std::suspend_always initial_suspend() { return {}; }
+  std::suspend_always final_suspend() noexcept { return {}; }
+  std::suspend_always yield_value(Tp v) {
+    value = v;
+    return {};
+  }
+  void return_void() {}
+  void unhandled_exception() {}
+};
+} // namespace coro::promises
